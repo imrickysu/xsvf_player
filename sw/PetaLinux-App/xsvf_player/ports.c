@@ -13,6 +13,9 @@
 /*#include "prgispx.h"*/
 
 #include "stdio.h"
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 extern FILE *in;
 static int  g_iTCK = 0; /* For xapp058_example .exe */
 static int  g_iTMS = 0; /* For xapp058_example .exe */
@@ -24,6 +27,10 @@ static int  g_iTDI = 0; /* For xapp058_example .exe */
 #define DATA_OFFSET    (unsigned short) 0
 #define STATUS_OFFSET  (unsigned short) 1
 #define CONTROL_OFFSET (unsigned short) 2
+
+// #define DEBUG_PRINT_JTAG_TOGGLE
+
+
 
 typedef union outPortUnion {
     unsigned char value;
@@ -59,6 +66,19 @@ static unsigned short base_port = 0x378;
 static int once = 0;
 #endif
 
+#define ZYNQ
+#ifdef ZYNQ
+#define TDI_PIN "960"
+#define TDO_PIN "961"
+#define TMS_PIN "962"
+#define TCK_PIN "963"
+
+/* Global Variables */
+int valuefd_tdi, valuefd_tdo, valuefd_tck, valuefd_tms;
+int line_count = 0;
+
+
+#endif
 
 /*BYTE *xsvf_data=0;*/
 
@@ -95,13 +115,27 @@ void setPort(short p,short val)
     /* Printing code for the xapp058_example.exe.  You must set the specified
        JTAG signal (p) to the new value (v).  See the above, old Win95 code
        as an implementation example. */
+    // convert value to string
+    char val_str[10];
+    sprintf(val_str, "%d", val);
+
+
     if (p==TMS)
+    {
         g_iTMS = val;
+        write(valuefd_tms, val_str, 2);
+    }
     if (p==TDI)
+    {
         g_iTDI = val;
+        write(valuefd_tdi, val_str, 2);
+    }
     if (p==TCK) {
         g_iTCK = val;
-        printf( "TCK = %d;  TMS = %d;  TDI = %d\n", g_iTCK, g_iTMS, g_iTDI );
+        write(valuefd_tck, val_str, 2);
+        #ifdef DEBUG_PRINT_JTAG_TOGGLE
+        printf( "%8d: TCK = %d;  TMS = %d;  TDI = %d\n", line_count++, g_iTCK, g_iTMS, g_iTDI );
+        #endif
     }
 }
 
@@ -138,8 +172,28 @@ unsigned char readTDOBit()
         return( (unsigned char) 1 );
     }
 #endif
+
+    open_tdo();
+
+    char val_str[2];
+    char val = 0;
+    int status;
     /* You must return the current value of the JTAG TDO signal. */
-    return( (unsigned char) 0 );
+    status = read(valuefd_tdo, val_str, 2);
+    if (status <= 0)
+    {
+        printf("TDO read error\n");
+        exit(1);
+    }
+    else {
+//        printf("%d: TDO=%s\n", line_count, &val_str[0]);
+        val = atoi(val_str);
+        #ifdef DEBUG_PRINT_JTAG_TOGGLE
+        printf("%d: TDO=%d\n", line_count++, val);
+        #endif
+    }
+    close(valuefd_tdo);
+    return( (unsigned char) val );
 }
 
 /* waitTime:  Implement as follows: */
@@ -200,4 +254,108 @@ void waitTime(long microsec)
     /* Use Windows Sleep().  Round up to the nearest millisec */
     _sleep( ( microsec + 999L ) / 1000L );
 #endif
+}
+
+int gpio_init(void)
+{
+    int exportfd, directionfd;
+ 
+    printf("Initializing GPIO...\n");
+
+    // The GPIO has to be exported to be able to see it
+    // in sysfs
+ 
+    exportfd = open("/sys/class/gpio/export", O_WRONLY);
+    if (exportfd < 0)
+    {
+        printf("Cannot open GPIO to export it\n");
+        exit(1);
+    }
+ 
+    write(exportfd, TDI_PIN, 4);
+    write(exportfd, TDO_PIN, 4);
+    write(exportfd, TCK_PIN, 4);
+    write(exportfd, TMS_PIN, 4);
+    close(exportfd);
+
+    // Update the direction of the GPIO to be an output
+
+    directionfd = open("/sys/class/gpio/gpio960/direction", O_RDWR);
+    if (directionfd < 0)
+    {
+        printf("Cannot open GPIO direction it\n");
+        exit(1);
+    }
+    write(directionfd, "out", 4);
+    close(directionfd);
+
+
+    directionfd = open("/sys/class/gpio/gpio961/direction", O_RDWR);
+    if (directionfd < 0)
+    {
+        printf("Cannot open GPIO direction it\n");
+        exit(1);
+    }
+    write(directionfd, "in", 4);
+    close(directionfd);
+
+    directionfd = open("/sys/class/gpio/gpio962/direction", O_RDWR);
+    if (directionfd < 0)
+    {
+        printf("Cannot open GPIO direction it\n");
+        exit(1);
+    }
+    write(directionfd, "out", 4);
+    close(directionfd);
+
+    directionfd = open("/sys/class/gpio/gpio963/direction", O_RDWR);
+    if (directionfd < 0)
+    {
+        printf("Cannot open GPIO direction it\n");
+        exit(1);
+    }
+    write(directionfd, "out", 4);
+    close(directionfd);
+
+    // open fd for values
+    valuefd_tdi = open("/sys/class/gpio/gpio960/value", O_RDWR);
+    if (valuefd_tdi < 0)
+    {
+        printf("Cannot open GPIO value\n");
+        exit(1);
+    }
+
+    valuefd_tdo = open("/sys/class/gpio/gpio961/value", O_RDWR);
+    if (valuefd_tdo < 0)
+    {
+        printf("Cannot open GPIO value\n");
+        exit(1);
+    }
+
+    valuefd_tms = open("/sys/class/gpio/gpio962/value", O_RDWR);
+    if (valuefd_tms < 0)
+    {
+        printf("Cannot open GPIO value\n");
+        exit(1);
+    }
+
+    valuefd_tck = open("/sys/class/gpio/gpio963/value", O_RDWR);
+    if (valuefd_tck < 0)
+    {
+        printf("Cannot open GPIO value\n");
+        exit(1);
+    }
+
+    return 0;
+}
+
+int open_tdo(void)
+{
+    valuefd_tdo = open("/sys/class/gpio/gpio961/value", O_RDWR);
+    if (valuefd_tdo < 0)
+    {
+        printf("Cannot open GPIO value\n");
+        exit(1);
+    }
+    return 0;
 }

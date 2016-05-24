@@ -1764,6 +1764,8 @@ int main( int iArgc, char** ppzArgv )
     clock_t startClock;
     clock_t endClock;
 
+
+
     iErrorCode          = XSVF_ERRORCODE( XSVF_ERROR_NONE );
     pzXsvfFileName      = 0;
 
@@ -1771,7 +1773,7 @@ int main( int iArgc, char** ppzArgv )
 
     for ( i = 1; i < iArgc ; ++i )
     {
-        if ( !_stricmp( ppzArgv[ i ], "-v" ) )
+        if ( !strcmp( ppzArgv[ i ], "-v" ) )
         {
             ++i;
             if ( i >= iArgc )
@@ -1809,6 +1811,7 @@ int main( int iArgc, char** ppzArgv )
         else
         {
             /* Initialize the I/O.  SetPort initializes I/O on first call */
+            gpio_init();
             setPort( TMS, 1 );
 
             /* Execute the XSVF in the file */

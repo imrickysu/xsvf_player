@@ -28,4 +28,6 @@ extern void readByte(unsigned char *data);
 
 extern void waitTime(long microsec);
 
+int gpio_init(void);
+
 #endif
