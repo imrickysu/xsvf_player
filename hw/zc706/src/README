@@ -1,0 +1,5 @@
+## project recreation workflow
+
+1. Create a project for zc706
+2. source design_1.tcl
+3. add pin.xdc as constraint
