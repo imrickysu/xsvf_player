@@ -1,0 +1,14 @@
+# Project Recreation Workflow
+
+## Auto Recreation ##
+1. change directory to `scripts` directory
+2. launch vivado
+3. run `source ./create_project.tcl` in tcl console
+
+## Manual Recreation ##
+1. Create a project for zc706 board
+2. source design_1.tcl to create block design
+3. add pin.xdc as constraint
+4. add design_1_wrapper.v as top module
+5. Generate bitstream
+6. Export hardware
